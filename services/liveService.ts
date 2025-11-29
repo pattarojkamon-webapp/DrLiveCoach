@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, LiveServerMessage, Modality, Blob } from '@google/genai';
 import { AppConfig, Role, ChatMessage } from '../types';
 
@@ -16,11 +17,13 @@ interface Callbacks {
   onAudioActivity: (isUserSpeaking: boolean) => void;
 }
 
-// Safely get API Key
-const getApiKey = () => {
+const getEffectiveApiKey = (config: AppConfig): string => {
+  if (config.apiKey && config.apiKey.trim().length > 0) {
+    return config.apiKey.trim();
+  }
   try {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env.API_KEY || '';
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      return process.env.API_KEY;
     }
   } catch (e) {
     // Ignore
@@ -32,9 +35,9 @@ export const createLiveSession = (
   config: AppConfig,
   callbacks: Callbacks
 ): LiveSessionController => {
-  const apiKey = getApiKey();
+  const apiKey = getEffectiveApiKey(config);
   
-  // We check API key inside connect to allow cleaner error handling flow
+  // We allow null here to let connect() handle the error reporting
   const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
   let sessionPromise: Promise<any> | null = null;
@@ -105,7 +108,7 @@ export const createLiveSession = (
 
     if (!apiKey || !ai) {
       console.error("API Key is missing for Live Mode");
-      callbacks.onStatusChange('error', 'API Key is missing. Please check your configuration or environment variables.');
+      callbacks.onStatusChange('error', 'API Key is missing. Please add your key in the Settings menu on the previous screen.');
       return;
     }
 
@@ -270,13 +273,17 @@ export const createLiveSession = (
           },
           onclose: () => {
             console.log("Live Session Closed");
-            // If we closed it manually, we might have already set state to disconnected.
-            // But if server closes it, we need to know.
           },
           onerror: (err) => {
             console.error("Live Session Error", err);
             let message = "Connection to AI server failed.";
-            if (err instanceof Error) message = err.message;
+            if (err instanceof Error) {
+               message = err.message;
+               // Handle common key errors
+               if (message.includes("403") || message.includes("400")) {
+                  message = "Invalid API Key. Please check your settings.";
+               }
+            }
             callbacks.onStatusChange('error', message);
           }
         }

@@ -1,27 +1,23 @@
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AppConfig, ChatMessage, EvaluationResult, Role } from "../types";
 import { MOCK_EVALUATION } from "../constants";
 
-// SAFELY ACCESS API KEY
-// We check if 'process' is defined to avoid "ReferenceError: process is not defined" in browsers
-const getApiKey = () => {
+// Helper to get key from Env or Config
+const getEffectiveApiKey = (config: AppConfig): string => {
+  if (config.apiKey && config.apiKey.trim().length > 0) {
+    return config.apiKey.trim();
+  }
+  // Fallback to env if available
   try {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env.API_KEY || '';
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      return process.env.API_KEY;
     }
   } catch (e) {
-    // Ignore error if process is not available
+    // Ignore
   }
   return '';
 };
-
-const apiKey = getApiKey();
-const isMockMode = !apiKey;
-
-let ai: GoogleGenAI | null = null;
-if (!isMockMode) {
-  ai = new GoogleGenAI({ apiKey });
-}
 
 // Helper to construct the system prompt
 const createSystemInstruction = (config: AppConfig): string => {
@@ -86,17 +82,14 @@ export const generateReply = async (
   history: ChatMessage[],
   config: AppConfig
 ): Promise<string> => {
-  if (isMockMode) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve("(Demo Mode: API Key missing) That sounds interesting. Tell me more about how that impacts your daily work?");
-      }, 1000);
-    });
+  const apiKey = getEffectiveApiKey(config);
+
+  if (!apiKey) {
+    return "(System: API Key is missing. Please enter your Gemini API Key in the Settings menu above.)";
   }
 
-  if (!ai) throw new Error("AI client not initialized");
-
   try {
+    const ai = new GoogleGenAI({ apiKey });
     const systemInstruction = createSystemInstruction(config);
     
     // Convert history to Gemini Content format
@@ -116,8 +109,11 @@ export const generateReply = async (
     });
 
     return response.text || "I'm having trouble thinking right now.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error:", error);
+    if (error.message && error.message.includes("403")) {
+      return "Error: Invalid API Key. Please check the key in Settings.";
+    }
     return "Error: Unable to connect to the coaching service. Please check your network or API key.";
   }
 };
@@ -126,15 +122,17 @@ export const generateEvaluation = async (
   history: ChatMessage[],
   config: AppConfig
 ): Promise<EvaluationResult> => {
-  if (isMockMode) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(MOCK_EVALUATION);
-      }, 2000);
-    });
+  const apiKey = getEffectiveApiKey(config);
+  
+  if (!apiKey) {
+    // Only return mock if specifically requested or key missing logic handled elsewhere, 
+    // but here we should probably alert the user. 
+    // For evaluation, failing gracefully to mock might be acceptable if we want to show *something*,
+    // but strictly adhering to instructions:
+    throw new Error("API Key is missing. Please configure it in Settings.");
   }
 
-  if (!ai) throw new Error("AI client not initialized");
+  const ai = new GoogleGenAI({ apiKey });
 
   const conversationText = history
     .map((m) => `${m.role.toUpperCase()}: ${m.text}`)
@@ -211,6 +209,7 @@ export const generateEvaluation = async (
     throw new Error("Empty response from evaluation");
   } catch (error) {
     console.error("Evaluation Error:", error);
-    return MOCK_EVALUATION;
+    // Fallback to mock only on critical failure if we really must, but let's rethrow or return empty to signal error
+    throw error;
   }
 };
