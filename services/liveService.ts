@@ -12,7 +12,7 @@ export interface LiveSessionController {
 }
 
 interface Callbacks {
-  onStatusChange: (status: 'connecting' | 'connected' | 'error' | 'disconnected') => void;
+  onStatusChange: (status: 'connecting' | 'connected' | 'error' | 'disconnected', error?: string) => void;
   onAudioActivity: (isUserSpeaking: boolean) => void;
 }
 
@@ -33,18 +33,9 @@ export const createLiveSession = (
   callbacks: Callbacks
 ): LiveSessionController => {
   const apiKey = getApiKey();
-  if (!apiKey) {
-    console.error("API Key is missing for Live Mode");
-    // We cannot throw effectively here without crashing UI in some flows, 
-    // so we call error callback immediately.
-    setTimeout(() => callbacks.onStatusChange('error'), 0);
-    return {
-      connect: async () => {},
-      disconnect: () => {},
-      getTranscript: () => []
-    };
-  }
-  const ai = new GoogleGenAI({ apiKey });
+  
+  // We check API key inside connect to allow cleaner error handling flow
+  const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
   let sessionPromise: Promise<any> | null = null;
   let audioContext: AudioContext | null = null;
@@ -111,6 +102,12 @@ export const createLiveSession = (
 
   const connect = async () => {
     callbacks.onStatusChange('connecting');
+
+    if (!apiKey || !ai) {
+      console.error("API Key is missing for Live Mode");
+      callbacks.onStatusChange('error', 'API Key is missing. Please check your configuration or environment variables.');
+      return;
+    }
 
     try {
       // 1. Setup Audio Context
@@ -182,23 +179,35 @@ export const createLiveSession = (
         callbacks: {
           onopen: async () => {
             console.log("Live Session Open");
+            
+            // Critical: Resume audio context if suspended (common in browsers)
+            if (audioContext && audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
             callbacks.onStatusChange('connected');
             
-            // Start Mic Stream
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            if (!audioContext) return;
-            
-            inputSource = audioContext.createMediaStreamSource(stream);
-            processor = audioContext.createScriptProcessor(4096, 1, 1);
-            
-            processor.onaudioprocess = (e) => {
-              const inputData = e.inputBuffer.getChannelData(0);
-              const pcmBlob = createBlob(inputData);
-              sessionPromise?.then(session => session.sendRealtimeInput({ media: pcmBlob }));
-            };
+            try {
+              // Start Mic Stream
+              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              if (!audioContext) return;
+              
+              inputSource = audioContext.createMediaStreamSource(stream);
+              processor = audioContext.createScriptProcessor(4096, 1, 1);
+              
+              processor.onaudioprocess = (e) => {
+                const inputData = e.inputBuffer.getChannelData(0);
+                const pcmBlob = createBlob(inputData);
+                sessionPromise?.then(session => session.sendRealtimeInput({ media: pcmBlob }))
+                  .catch(err => console.error("Error sending input:", err));
+              };
 
-            inputSource.connect(processor);
-            processor.connect(audioContext.destination);
+              inputSource.connect(processor);
+              processor.connect(audioContext.destination);
+            } catch (mediaErr) {
+              console.error("Microphone Access Error:", mediaErr);
+              callbacks.onStatusChange('error', 'Microphone access denied. Please allow microphone permissions.');
+            }
           },
           onmessage: async (msg: LiveServerMessage) => {
              // 1. Handle Audio Output
@@ -261,18 +270,21 @@ export const createLiveSession = (
           },
           onclose: () => {
             console.log("Live Session Closed");
-            callbacks.onStatusChange('disconnected');
+            // If we closed it manually, we might have already set state to disconnected.
+            // But if server closes it, we need to know.
           },
           onerror: (err) => {
             console.error("Live Session Error", err);
-            callbacks.onStatusChange('error');
+            let message = "Connection to AI server failed.";
+            if (err instanceof Error) message = err.message;
+            callbacks.onStatusChange('error', message);
           }
         }
       });
       
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to init live session", e);
-      callbacks.onStatusChange('error');
+      callbacks.onStatusChange('error', e.message || "Failed to initialize session.");
     }
   };
 
@@ -287,7 +299,7 @@ export const createLiveSession = (
     sessionPromise?.then(session => {
         // @ts-ignore
         if (session.close) session.close(); 
-    });
+    }).catch(e => console.error("Error closing session:", e));
     
     callbacks.onStatusChange('disconnected');
   };

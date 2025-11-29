@@ -1,9 +1,8 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { AppConfig, ChatMessage, Theme, Role } from '../types';
 import { createLiveSession, LiveSessionController } from '../services/liveService';
 import { TRANSLATIONS } from '../constants';
-import { Mic, MicOff, PhoneOff, Activity, User, Bot } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Activity, User, Bot, AlertTriangle, ArrowLeft, RotateCcw } from 'lucide-react';
 
 interface Props {
   config: AppConfig;
@@ -13,6 +12,7 @@ interface Props {
 
 const LiveInterface: React.FC<Props> = ({ config, theme, onEndSession }) => {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('connecting');
+  const [errorMsg, setErrorMsg] = useState('');
   const [isUserTurn, setIsUserTurn] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -20,14 +20,26 @@ const LiveInterface: React.FC<Props> = ({ config, theme, onEndSession }) => {
   const controllerRef = useRef<LiveSessionController | null>(null);
   const t = TRANSLATIONS[config.language];
 
-  useEffect(() => {
+  // Function to initialize/reset session
+  const startSession = () => {
+    setStatus('connecting');
+    setErrorMsg('');
+    setDuration(0);
+
     const controller = createLiveSession(config, {
-      onStatusChange: (s) => setStatus(s),
+      onStatusChange: (s, msg) => {
+        setStatus(s);
+        if (msg) setErrorMsg(msg);
+      },
       onAudioActivity: (isUser) => setIsUserTurn(isUser),
     });
     
     controllerRef.current = controller;
     controller.connect();
+  };
+
+  useEffect(() => {
+    startSession();
 
     const timer = setInterval(() => {
        if (status === 'connected') setDuration(d => d + 1);
@@ -35,7 +47,7 @@ const LiveInterface: React.FC<Props> = ({ config, theme, onEndSession }) => {
 
     return () => {
       clearInterval(timer);
-      controller.disconnect();
+      controllerRef.current?.disconnect();
     };
   }, []); // Run once on mount
 
@@ -51,6 +63,11 @@ const LiveInterface: React.FC<Props> = ({ config, theme, onEndSession }) => {
     onEndSession(history);
   };
 
+  const handleRetry = () => {
+    controllerRef.current?.disconnect();
+    startSession();
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] items-center justify-center relative overflow-hidden bg-slate-900 rounded-xl shadow-2xl">
       
@@ -62,8 +79,36 @@ const LiveInterface: React.FC<Props> = ({ config, theme, onEndSession }) => {
              style={{ backgroundColor: theme.primary }}></div>
       </div>
 
+      {/* ERROR OVERLAY */}
+      {status === 'error' && (
+        <div className="absolute inset-0 z-50 bg-slate-900/95 flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+          <div className="p-4 rounded-full bg-red-500/10 mb-6">
+            <AlertTriangle className="w-16 h-16 text-red-500" />
+          </div>
+          <h3 className="text-2xl font-bold text-white mb-2 font-['Prompt']">{t.liveError}</h3>
+          <p className="text-slate-400 mb-8 max-w-md">{errorMsg || "Unable to establish a stable connection with the AI server."}</p>
+          
+          <div className="flex gap-4">
+            <button 
+              onClick={handleEndCall}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 transition-all font-bold"
+            >
+              <ArrowLeft size={20} />
+              Back
+            </button>
+            <button 
+              onClick={handleRetry}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700 transition-all font-bold shadow-lg shadow-red-900/30"
+            >
+              <RotateCcw size={20} />
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
-      <div className="z-10 flex flex-col items-center space-y-12 w-full max-w-md p-8">
+      <div className={`z-10 flex flex-col items-center space-y-12 w-full max-w-md p-8 transition-opacity duration-300 ${status === 'error' ? 'opacity-20 blur-sm' : 'opacity-100'}`}>
         
         {/* Header Info */}
         <div className="text-center space-y-2">
@@ -109,7 +154,8 @@ const LiveInterface: React.FC<Props> = ({ config, theme, onEndSession }) => {
         <div className="flex items-center gap-6">
            <button 
              onClick={() => setIsMuted(!isMuted)} // Note: Visual only for now, would need MediaStream track enabling in real impl
-             className={`p-4 rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-all ${isMuted ? 'bg-red-900/50 text-red-400' : ''}`}
+             disabled={status !== 'connected'}
+             className={`p-4 rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isMuted ? 'bg-red-900/50 text-red-400' : ''}`}
            >
              {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
            </button>
