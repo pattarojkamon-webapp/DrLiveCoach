@@ -1,22 +1,27 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AppState, AppConfig, ChatMessage, EvaluationResult, Role, Theme, Language, SessionRecord, User } from './types';
 import Configuration from './components/Configuration';
 import ChatInterface from './components/ChatInterface';
 import LiveInterface from './components/LiveInterface';
 import EvaluationDashboard from './components/EvaluationDashboard';
 import HistoryList from './components/HistoryList';
-import AuthPage from './components/AuthPage';
 import GuideModal from './components/GuideModal';
 import { generateReply, generateEvaluation } from './services/geminiService';
 import { saveSession } from './services/storageService';
-import { authService } from './services/authService';
 import { THEMES, TRANSLATIONS } from './constants';
-import { BrainCircuit, Globe, Palette, FileText, BookOpen, LogOut, User as UserIcon } from 'lucide-react';
+import { BrainCircuit, Globe, Palette, FileText, BookOpen } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [appState, setAppState] = useState<AppState>('AUTH');
+  // Initialize as Guest User
+  const [currentUser] = useState<User>({
+    id: 'guest_default',
+    username: 'guest',
+    name: 'Guest User',
+    createdAt: Date.now()
+  });
+
+  const [appState, setAppState] = useState<AppState>('CONFIG');
   
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -29,31 +34,6 @@ const App: React.FC = () => {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const t = TRANSLATIONS[currentLang];
-
-  // Check Auth on Load
-  useEffect(() => {
-    const user = authService.getCurrentUser();
-    if (user) {
-      setCurrentUser(user);
-      setAppState('CONFIG');
-    } else {
-      setAppState('AUTH');
-    }
-  }, []);
-
-  const handleLoginSuccess = (user: User) => {
-    setCurrentUser(user);
-    setAppState('CONFIG');
-  };
-
-  const handleLogout = () => {
-    authService.logout();
-    setCurrentUser(null);
-    setAppState('AUTH');
-    setMessages([]);
-    setEvaluation(null);
-    setConfig(null);
-  };
 
   const startSession = async (newConfig: AppConfig) => {
     setConfig(newConfig);
@@ -152,17 +132,6 @@ const App: React.FC = () => {
     setAppState('EVALUATION');
   };
 
-  // Render Auth Page independently
-  if (appState === 'AUTH') {
-    return (
-      <AuthPage 
-        theme={currentTheme} 
-        language={currentLang} 
-        onLoginSuccess={handleLoginSuccess}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col font-sans text-slate-800 transition-colors duration-500" style={{ backgroundColor: currentTheme.background }}>
       
@@ -243,32 +212,6 @@ const App: React.FC = () => {
                        {lang === 'TH' ? '🇹🇭 ไทย' : lang === 'EN' ? '🇺🇸 English' : '🇨🇳 中文'}
                      </button>
                    ))}
-                 </div>
-               </div>
-             </div>
-
-             <div className="h-6 w-px bg-slate-200 mx-1"></div>
-
-             {/* User Profile / Logout */}
-             <div className="relative group">
-               <button className="flex items-center gap-2 p-1.5 pr-3 rounded-full hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200">
-                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: currentTheme.secondary }}>
-                   {currentUser?.name.charAt(0).toUpperCase()}
-                 </div>
-               </button>
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden hidden group-hover:block animate-fade-in z-50">
-                 <div className="p-4 border-b border-slate-100">
-                    <p className="text-sm font-bold text-slate-900 truncate">{currentUser?.name}</p>
-                    <p className="text-xs text-slate-500 truncate">@{currentUser?.username}</p>
-                 </div>
-                 <div className="p-1">
-                   <button
-                     onClick={handleLogout}
-                     className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
-                   >
-                     <LogOut size={16} />
-                     {t.logout}
-                   </button>
                  </div>
                </div>
              </div>

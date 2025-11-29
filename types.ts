@@ -80,4 +80,4 @@ export interface SessionRecord {
   evaluation: EvaluationResult;
 }
 
-export type AppState = 'AUTH' | 'CONFIG' | 'CHAT' | 'LIVE_SESSION' | 'EVALUATION' | 'LOADING_EVALUATION' | 'HISTORY';
+export type AppState = 'CONFIG' | 'CHAT' | 'LIVE_SESSION' | 'EVALUATION' | 'LOADING_EVALUATION' | 'HISTORY';
