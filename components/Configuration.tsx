@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AppConfig, CoachingModel, Role, Persona, Theme, Language, InteractionType } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { User, Settings, Mic, MessageCircle, PlayCircle, Key, ChevronDown, ChevronUp } from 'lucide-react';
+import { User, Briefcase, MessageSquare, PlayCircle, Settings, Mic, MessageCircle } from 'lucide-react';
 
 interface Props {
   onStart: (config: AppConfig) => void;
@@ -21,30 +21,12 @@ const Configuration: React.FC<Props> = ({ onStart, theme, language }) => {
     position: 'Manager',
     topic: 'Struggling with work-life balance and burnout.',
   });
-  
-  // API Key State
-  const [apiKey, setApiKey] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
 
   const t = TRANSLATIONS[language];
 
-  // Load API Key from localStorage on mount
-  useEffect(() => {
-    const storedKey = localStorage.getItem('gemini_api_key');
-    if (storedKey) setApiKey(storedKey);
-  }, []);
-
-  // Save API Key
-  const handleSaveApiKey = () => {
-    if (apiKey.trim()) {
-      localStorage.setItem('gemini_api_key', apiKey.trim());
-      setShowSettings(false);
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onStart({ userRole, persona, model, language, interactionType, apiKey: apiKey.trim() });
+    onStart({ userRole, persona, model, language, interactionType });
   };
 
   // Input common style
@@ -57,60 +39,18 @@ const Configuration: React.FC<Props> = ({ onStart, theme, language }) => {
         
         {/* Header with Gradient */}
         <div className="p-8 text-white relative overflow-hidden" style={{ background: theme.gradient }}>
-           <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                <Settings className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold font-['Prompt'] leading-tight">{t.setupTitle}</h2>
-                <p className="opacity-80 font-['Inter'] text-sm mt-1">{t.setupDesc}</p>
-              </div>
+           <div className="relative z-10 flex items-center gap-3">
+            <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+              <Settings className="w-6 h-6" />
             </div>
-            
-            {/* Settings Toggle */}
-            <button 
-              onClick={() => setShowSettings(!showSettings)}
-              className="p-2 rounded-full hover:bg-white/20 transition-colors"
-            >
-              {showSettings ? <ChevronUp size={24} /> : <Settings size={24} />}
-            </button>
+            <div>
+              <h2 className="text-2xl font-bold font-['Prompt'] leading-tight">{t.setupTitle}</h2>
+              <p className="opacity-80 font-['Inter'] text-sm mt-1">{t.setupDesc}</p>
+            </div>
           </div>
           {/* Abstract decoration */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
         </div>
-
-        {/* Settings Area (Collapsible) */}
-        {showSettings && (
-          <div className="bg-slate-50 border-b border-slate-200 p-6 animate-fade-in">
-            <div className="max-w-2xl mx-auto space-y-4">
-              <div className="flex items-center gap-2 text-slate-800 font-bold">
-                <Key className="w-5 h-5 text-amber-500" />
-                {t.settings}
-              </div>
-              <div>
-                <label className={labelClass}>{t.apiKeyLabel}</label>
-                <input 
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={t.apiKeyPlaceholder}
-                  className={inputClass}
-                  style={{ '--tw-ring-color': theme.secondary } as React.CSSProperties}
-                />
-                <p className="text-xs text-slate-500 mt-2">{t.apiKeyDesc}</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleSaveApiKey}
-                className="px-4 py-2 rounded-lg text-white font-bold text-sm"
-                style={{ backgroundColor: theme.primary }}
-              >
-                {t.saveBtn}
-              </button>
-            </div>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-8">
           

@@ -19,7 +19,9 @@ interface ErrorBoundaryState {
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false, error: null };
 
-  // Removed redundant constructor to resolve TS props inference issue
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+  }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };

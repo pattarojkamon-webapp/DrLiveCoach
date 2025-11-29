@@ -39,7 +39,6 @@ export interface AppConfig {
   model: CoachingModel;
   language: Language;
   interactionType: InteractionType;
-  apiKey?: string; // Optional: User provided API Key
 }
 
 export interface ChatMessage {
