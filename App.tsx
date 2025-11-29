@@ -13,10 +13,10 @@ import { THEMES, TRANSLATIONS } from './constants';
 import { BrainCircuit, Globe, Palette, FileText, BookOpen } from 'lucide-react';
 
 const App: React.FC = () => {
-  // Initialize as Guest User
+  // Initialize as Default Guest User
   const [currentUser] = useState<User>({
-    id: 'guest_default',
-    username: 'guest',
+    id: 'guest_user',
+    username: 'Guest',
     name: 'Guest User',
     createdAt: Date.now()
   });
@@ -155,11 +155,11 @@ const App: React.FC = () => {
              {/* Guide Button */}
              <button
                onClick={() => setIsGuideOpen(true)}
-               className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors hidden md:flex items-center gap-2"
+               className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors flex items-center gap-2"
                title={t.guideBtn}
              >
                <BookOpen size={20} />
-               <span className="text-sm font-medium">{t.guideBtn}</span>
+               <span className="text-sm font-medium hidden md:inline">{t.guideBtn}</span>
              </button>
 
              {/* History Button */}

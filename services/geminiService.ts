@@ -1,10 +1,21 @@
-
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AppConfig, ChatMessage, EvaluationResult, Role } from "../types";
 import { MOCK_EVALUATION } from "../constants";
 
-// Initialize Gemini Client
-const apiKey = process.env.API_KEY || '';
+// SAFELY ACCESS API KEY
+// We check if 'process' is defined to avoid "ReferenceError: process is not defined" in browsers
+const getApiKey = () => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.API_KEY || '';
+    }
+  } catch (e) {
+    // Ignore error if process is not available
+  }
+  return '';
+};
+
+const apiKey = getApiKey();
 const isMockMode = !apiKey;
 
 let ai: GoogleGenAI | null = null;

@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, LiveServerMessage, Modality, Blob } from '@google/genai';
 import { AppConfig, Role, ChatMessage } from '../types';
 
@@ -17,13 +16,33 @@ interface Callbacks {
   onAudioActivity: (isUserSpeaking: boolean) => void;
 }
 
+// Safely get API Key
+const getApiKey = () => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.API_KEY || '';
+    }
+  } catch (e) {
+    // Ignore
+  }
+  return '';
+};
+
 export const createLiveSession = (
   config: AppConfig,
   callbacks: Callbacks
 ): LiveSessionController => {
-  const apiKey = process.env.API_KEY || '';
+  const apiKey = getApiKey();
   if (!apiKey) {
-    throw new Error("API Key is missing for Live Mode");
+    console.error("API Key is missing for Live Mode");
+    // We cannot throw effectively here without crashing UI in some flows, 
+    // so we call error callback immediately.
+    setTimeout(() => callbacks.onStatusChange('error'), 0);
+    return {
+      connect: async () => {},
+      disconnect: () => {},
+      getTranscript: () => []
+    };
   }
   const ai = new GoogleGenAI({ apiKey });
 
@@ -114,7 +133,8 @@ export const createLiveSession = (
             break;
           case 'Non-binary':
             voiceName = 'Puck'; // Playful, higher range
-            toneInstruction = "Adopt a lively, expressive, slightly sassy tone (channeling a 'Queen' persona) while remaining realistic to the professional context.";
+            // Specific instruction for Non-binary "Gay queen" persona
+            toneInstruction = "Adopt a lively, expressive, sassy tone (channeling a 'Queen' persona). Use colorful expressions while remaining realistic to the professional context.";
             break;
           default:
             voiceName = 'Kore';
